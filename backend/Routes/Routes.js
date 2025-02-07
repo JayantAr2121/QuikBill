@@ -4,7 +4,7 @@ const { User, Shopkeeper, Executive } = require('../Model/UserModel/UserModel')
 const { otpGenerator, verifyOtp } = require('../Services/otp/Otp')
 const EmailSender = require('../Services/Email/emailSender')
 const Product = require("../Model/ProductModel/Product.model")
-const Customer = require("../Model/CustomerModel/Customer.Model")
+const Customer = require("../Model/CustomerModel/Customer.js")
 const jwt = require("jsonwebtoken");
 const checkuserdetails = require("../Middleware/Checkuserdetails")
 require('dotenv').config()
@@ -15,7 +15,7 @@ Routes.get('/', async (req, resp) => {
 })
 
 // User API
-Routes.post('/verifyUser', checkuserdetails, async (req, resp) => {
+Routes.post('/verify', checkuserdetails, async (req, resp) => {
     try {
         const { name, phone, email, address, password, city, state, role } = req.body
 
@@ -189,156 +189,30 @@ Routes.get("/GetProducts", checkuserdetails, async (req, resp) => {
 
 
 // Customers API
-Routes.post("/CreateCustomer", checkuserdetails, async (req, resp) => {
+Routes.post("/createcustomer",checkuserdetails,async(req,resp)=>{
     try {
-        const { customerName, customerPhone, customerAddress, Balance, customerEmail } = req.body
-        if (!customerName || !customerPhone || !customerAddress || !customerEmail) return resp.status(401).json({ message: "Feild is Empyty" })
-        const alreadyExist = await Customer.findOne({ customerEmail })
-        if (alreadyExist) return resp.status(400).send({ message: "Account already Exist" })
-        const result = await Customer.create({ userid: req.user._id, customerName, customerPhone, customerAddress, Balance, customerEmail })
-        resp.status(202).send({ message: "created successfull", result })
-    } catch (error) {
-
-        return resp.status(500).send({ message: "internal server error", error })
-    }
-})
-Routes.put("/UpdateCustomer/:id", async (req, resp) => {
-    try {
-
-        const { shopkeeperid, customerName, customerPhone, customerAddress, Balance, customerEmail } = req.body
-        if (!shopkeeperid || !customerName || !customerPhone || !customerAddress || !customerEmail) return resp.status(401).json({ message: "Feild is Empyty" })
-
-        const { id } = req.params;
-        if (!id) return resp.status(404).send({ message: "Plz send the the id of customer " });
-        const existingproduct = await Customer.findOne({ _id: id });
-        if (!existingproduct) return resp.status(404).send({ message: "This customer is not found in your customer list" });
-        const result = await Customer.updateOne({ _id: id }, { $set: { shopkeeperid, customerName, customerPhone, customerAddress, Balance, customerEmail } })
-        resp.status(202).send({ message: "updated successfull", result })
-    } catch (error) {
-        return resp.status(500).send({ message: "internal server error", error })
-    }
-
-})
-Routes.delete("/DeleteCustomer/:id", async (req, resp) => {
-    try {
-        const { id } = req.params;
-        if (!id) return resp.status(404).send({ message: "Plz select the customer" });
-        const existingcustomer = await Customer.findOne({ _id: id });
-        if (!existingcustomer) return resp.status(404).send({ message: "This customer is not found in your customer list" })
-        const result = await Customer.deleteOne({ "_id": id })
-        resp.status(202).send({ message: "Deleted Successfully", result })
-    } catch (error) {
-        return resp.status(500).send({ message: "internal server error", error })
-    }
-})
-Routes.get("/GetCustomer/:id", async (req, resp) => {
-    try {
-        const { id } = req.params;
-        if (!id) return resp.status(404).send({ message: "Plz give the id of Shopkeeper" });
-        const allCustomer = await Customer.find({ shopkeeperid: id });
-        return resp.status(201).send({ message: "all Customers", allCustomer });
+      const {name,phone,address}=req.body
+      if(!name || !phone || !address) return resp.status(404).json({message:"Feild is empty"})
+        const existingcustomer=await Customer.findOne({phone})
+      if(existingcustomer) return resp.status(400).json({message:"Customer Already Exists"})
+        const newcustomer= await Customer.create({name,phone,address,customerof:req.user._id})
+      return resp.status(202).send({message:"Customer Created Successfully",newcustomer})
     } catch (error) {
         return resp.status(500).send({ message: "Internal Server error", error });
     }
-})
-
-
-// User API
-Routes.post('/verify', checkuserdetails, async (req, resp) => {
+  })
+  Routes.get("/getallcustomers",checkuserdetails,async(req,resp)=>{
     try {
-        const { name, phone, email, address, password, city, state, role } = req.body
-
-        if (!name || !phone || !email || !password || !city || city === "None" || !address || !state || state === "None" || !role) return resp.status(404).send({ message: "Feild is Empyty" })
-
-        const alreadyExist = await User.findOne({ email })
-        if (alreadyExist) return resp.status(400).send({ message: "Account already Exist" })
-
-
-        const otp = otpGenerator(email)
-
-        const response = EmailSender(email, otp)
-
-        resp.status(202).send({ message: "otp Send", otp, response })
+      const existingcustomers=await Customer.find({customerof:req.user._id})
+      if(!existingcustomers || existingcustomers.length===0) return resp.status(404).json({message:"Customer list is empty"})
+      return resp.status(202).send({message:"Customers fetched successfully",existingcustomers})
     } catch (error) {
-        return resp.status(500).send({ Message: "Internal Error", error })
+        return resp.status(500).send({ message: "Internal Server error", error });
     }
+  })
 
-})
-Routes.post('/CreateAccount', checkuserdetails, async (req, resp) => {
-    try {
 
-        const { name, phone, email, address, password, city, state, role, otp } = req.body
 
-        if (!name || !phone || !email || !address || !city || city === "None" || !state || state === "None" || !password || !role) return resp.status(404).send({ message: "Feild is Empyty" })
-
-        if (!otp) return resp.status(404).send({ message: "Enter the Otp" })
-
-        const existinguser = await User.findOne({ email });
-        if (existinguser) return resp.status(400).json({ "Message": "Account already exists" })
-
-        const result = verifyOtp(email, otp)
-        if (!result.status) return resp.status(401).send({ result })
-
-        const createresp = await User.create({ name, phone, email, address, password, city, state, role })
-        return resp.status(201).send({ message: "Account Created Successfully", createresp })
-    } catch (error) {
-        resp.status(500).send({ Message: "Internal Error", error })
-    }
-
-})
-Routes.post('/Login', checkuserdetails, async (req, resp) => {
-
-    try {
-        const { email, password } = req.body
-        if (!email || !password) return resp.status(404).send({ message: "Feild is Empyty" })
-
-        const validuser = await User.findOne({ email })
-        if (!validuser) return resp.status(404).send({ message: "user not found" })
-
-        if (validuser.password !== password) return resp.status(404).send({ message: "Wrong Password" })
-
-        if (!validuser.service) return resp.status(400).send({ message: "No Subscription" })
-
-        const payload = { id: validuser._id }
-
-        const token = jwt.sign(payload, process.env.JSON_SECRET_KEY)
-
-        resp.status(202).send({ message: "Login Successfully", "resultObj": { token, role: validuser.role } })
-    } catch (error) {
-        resp.status(500).send({ Message: "Internal Error", error })
-    }
-})
-Routes.post("/enableUser", checkuserdetails, async (req, resp) => {
-
-    try {
-        const { id } = req.body;
-        if (!id) return resp.status(404).send({ message: "Plz Select the user" });
-
-        const existinguser = await User.findOne({ _id: id });
-        if (!existinguser) return resp.status(404).send({ message: "User is not found" });
-
-        const result = await User.updateOne({ _id: id }, { $set: { service: true } });
-        return resp.status(202).send({ message: "Service is enabled", result })
-    } catch (error) {
-        return resp.status(500).send({ message: "Internal Server error", error })
-    }
-});
-Routes.post("/disableUser", checkuserdetails, async (req, resp) => {
-    try {
-        const { id } = req.body;
-        if (!id) return resp.status(404).send({ message: "Plz Select the user" });
-
-        const existinguser = await User.findOne({ _id: id });
-        if (!existinguser) returnresp.status(404).send({ message: "User is not found" });
-
-        const result = await User.updateOne({ _id: id }, { $set: { service: false } });
-        return resp.status(202).send({ message: "Service is disabled", result })
-
-    } catch (error) {
-        return resp.status(404).send({ message: "Internal Server error", error })
-    }
-
-});
 
 // Getting All ShopKeepers
 Routes.get("/getallShopkeepers", checkuserdetails, async (req, resp) => {
@@ -478,4 +352,5 @@ Routes.put("/disableExecutive", checkuserdetails, async (req, resp) => {
         return resp.status(500).json({ mesage: "Internal Server error", error })
     }
 });
+
 module.exports = Routes
