@@ -11,7 +11,7 @@ const CustomerSchema=new mongoose.Schema({
         required:true
     },
     phone:{
-        type:Number,
+        type:String,
         required:true
     },
     address:{
@@ -27,5 +27,6 @@ const CustomerSchema=new mongoose.Schema({
         default:Date.now
     }
 })
+CustomerSchema.index({ customerof: 1, phone: 1 }, { unique: true });
 const Customer=mongoose.model(process.env.MONGODB_CUSTOMERS_COLLECTION,CustomerSchema)
 module.exports=Customer

@@ -7,6 +7,9 @@ const Product = require("../Model/ProductModel/Product.model")
 const Customer = require("../Model/CustomerModel/Customer.js")
 const jwt = require("jsonwebtoken");
 const checkuserdetails = require("../Middleware/Checkuserdetails")
+const { default: mongoose } = require("mongoose")
+const { Transaction, Invoice, Payment } = require("../Model/TransactionModel/Transaction.model.js")
+const OrderedItems = require("../Model/OrderModel/Order.model.js")
 require('dotenv').config()
 
 // Health Check API
@@ -136,10 +139,10 @@ Routes.post('/UploadProduct', checkuserdetails, async (req, resp) => {
         const { name, company, model, description, price, discount, rate, tax, stock } = req.body
         if (!name || !company || !model || !description || !price || !discount || !rate || !tax || !stock) return resp.status(404).send({ message: "Feild is Empyty" })
 
-        const existingproduct = await Product.findOne({ model });
+        const existingproduct = await Product.findOne({ model, userid: req.user._id });
         if (existingproduct) return resp.status(400).send({ message: "Product of this model already exists" });
 
-        const result = await Product.create({ userid: req.user._id, name, company, model, description, price, discount, rate, tax, stock })
+        const result = await Product.create({ userid: req.user._id, name, company, model:model, description, price, discount, rate, tax, stock })
         resp.status(202).send({ message: "Uploaded Successfully", result })
     } catch (error) {
         resp.status(500).send({ Message: "Internal Error", error })
@@ -169,7 +172,7 @@ Routes.put("/UpdateProduct/:id", checkuserdetails, async (req, resp) => {
     if (!id) return resp.status(404).send({ message: "Plz select the product" });
     const existingproduct = await Product.findOne({ _id: id, userid: req.user._id });
     if (!existingproduct) return resp.status(404).send({ message: "This product is not found in your product list" });
-    const response = await Product.findOne({ model });
+    const response = await Product.findOne({ model, userid: req.user._id });
 
     if (response && response._id.toString() !== id) return resp.status(400).send({ message: "Product of this model is already exists in your product list" });
 
@@ -189,27 +192,27 @@ Routes.get("/GetProducts", checkuserdetails, async (req, resp) => {
 
 
 // Customers API
-Routes.post("/createcustomer",checkuserdetails,async(req,resp)=>{
+Routes.post("/createcustomer", checkuserdetails, async (req, resp) => {
     try {
-      const {name,phone,address}=req.body
-      if(!name || !phone || !address) return resp.status(404).json({message:"Feild is empty"})
-        const existingcustomer=await Customer.findOne({phone})
-      if(existingcustomer) return resp.status(400).json({message:"Customer Already Exists"})
-        const newcustomer= await Customer.create({name,phone,address,customerof:req.user._id})
-      return resp.status(202).send({message:"Customer Created Successfully",newcustomer})
+        const { name, phone, address } = req.body
+        if (!name || !phone || !address) return resp.status(404).json({ message: "Feild is empty" })
+        const existingcustomer = await Customer.findOne({ phone })
+        if (existingcustomer) return resp.status(400).json({ message: "Customer Already Exists" })
+        const newcustomer = await Customer.create({ name, phone, address, customerof: req.user._id })
+        return resp.status(202).send({ message: "Customer Created Successfully", newcustomer })
     } catch (error) {
         return resp.status(500).send({ message: "Internal Server error", error });
     }
-  })
-  Routes.get("/getallcustomers",checkuserdetails,async(req,resp)=>{
+})
+Routes.get("/getallcustomers", checkuserdetails, async (req, resp) => {
     try {
-      const existingcustomers=await Customer.find({customerof:req.user._id})
-      if(!existingcustomers || existingcustomers.length===0) return resp.status(404).json({message:"Customer list is empty"})
-      return resp.status(202).send({message:"Customers fetched successfully",existingcustomers})
+        const existingcustomers = await Customer.find({ customerof: req.user._id })
+        if (!existingcustomers || existingcustomers.length === 0) return resp.status(404).json({ message: "Customer list is empty" })
+        return resp.status(202).send({ message: "Customers fetched successfully", existingcustomers })
     } catch (error) {
         return resp.status(500).send({ message: "Internal Server error", error });
     }
-  })
+})
 
 
 
@@ -235,7 +238,22 @@ Routes.get("/getallcitiesandstates", checkuserdetails, async (req, resp) => {
     }
 })
 
+//  Get Transaction 
+Routes.get("/getalltransactions/:id", checkuserdetails, async (req, resp) => {
+    try {
+        const { id } = req.params
+        if (!id || !mongoose.isValidObjectId(id)) return resp.status(404).json({ message: "Customer is not valid" })
 
+        const existingCustomer = await Customer.findOne({ _id: id })
+        if (!existingCustomer) return resp.status(404).json({ message: "Customer not found" })
+
+        const result = await Transaction.find({ shopkeeperId: req.user._id, customerId: id })
+        if (!result || result.length === 0) return resp.status(404).json({ message: "Transaction list is empty" })
+        return resp.status(202).json({ message: "Transactions fetched successfully", result })
+    } catch (error) {
+        return resp.status(500).json({ message: "Internal Server Error", error })
+    }
+})
 // Multiple Products
 const validateObjectKeys = (object, schema) => {
 
@@ -352,5 +370,134 @@ Routes.put("/disableExecutive", checkuserdetails, async (req, resp) => {
         return resp.status(500).json({ mesage: "Internal Server error", error })
     }
 });
+
+// generate Invoice
+async function generateInvoiceNumber(userid) {
+    const lastInvoice = await Invoice.findOne({ shopkeeperId: userid }).sort({ _id: -1 });
+    let newInvoiceNumber;
+    if (lastInvoice) {
+        let lastNumber = parseInt(lastInvoice.InvoiceNo.split('-')[1]) + 1;
+        newInvoiceNumber = `INV-${lastNumber.toString().padStart(5, '0')}`;
+    } else {
+        newInvoiceNumber = 'INV-00001';
+    }
+    return newInvoiceNumber;
+}
+
+const validateordereditems = (object) => {
+    if (Object.keys(object).length === 0) return "Product Detail not found";
+    if (!object.id || object.id === "" || object.id == null || !mongoose.isValidObjectId(object.id)) return "Product id is invalid";
+    if (!object.quantity || object.quantity === "" || object.quantity === null || object.quantity <= 0) return "Product quantity is invalid";
+    return null;
+};
+
+Routes.post('/createInvoice/:id', checkuserdetails, async (req, resp) => {
+    try {
+        const { id } = req.params
+        if (!id || !mongoose.isValidObjectId(id)) return resp.status(404).json({ message: "Customer is not valid" })
+
+        const existingCustomer = await Customer.findOne({ _id: id })
+        if (!existingCustomer) return resp.status(404).json({ message: "Customer Not Found" })
+
+        const { ordereditems } = req.body
+        if (!ordereditems) return resp.status(404).json({ message: "Select the Items" })
+
+        if (!Array.isArray(ordereditems) || ordereditems.length === 0) return resp.status(400).json({ message: 'Invalid input. Provide an array of items' })
+
+        const iserror = []
+
+        ordereditems.map(async (item, index) => {
+            const validationError = validateordereditems(item)
+            if (validationError) iserror.push({ index, error: validationError })
+        })
+
+        if (iserror.length > 0) return resp.status(400).json({ message: "Validation error occur", iserror })
+
+        const allids = ordereditems.map(item => new mongoose.Types.ObjectId(item.id))
+        const allproducts = await Product.find({ _id: { $in: allids } })
+        if (allids.length !== allproducts.length) return resp.status(404).json({ message: "One or More Products is missing" })
+
+        for (const item of ordereditems) {
+            const existingProduct = await Product.findOne({ _id: item.id, userid: req.user._id })
+            if (existingProduct.stock < item.quantity) return resp.status(404).json({ message: "Stock of this product:" + existingProduct.name + "is insufficient" })
+        }
+        const newOrder = []
+        for (const item of ordereditems) {
+            const existingProduct = await Product.findOne({ _id: item.id, userid: req.user._id })
+            existingProduct.stock -= item.quantity
+            await existingProduct.save()
+            const { name, model, company, description, rate, price, tax, discount } = existingProduct
+            const obj = { name, model, company, description, rate, price, tax, discount, quantity: item.quantity, subtotal: price * item.quantity }
+            newOrder.push(obj)
+        }
+
+
+        let TotalTax = 0
+        let TotalDiscount = 0
+        let TotalCost = 0
+        let Subtotal = 0
+
+        for (const item of newOrder) {
+            TotalTax += item.quantity * ((item.price * item.tax) / 100)
+            TotalDiscount += item.quantity * ((item.price * item.discount) / 100)
+            Subtotal += item.quantity * item.price
+            TotalCost += item.quantity * item.rate
+        }
+
+        const grandtotal = Subtotal - TotalDiscount + TotalTax
+        const totalprofit = grandtotal - TotalCost - TotalDiscount - TotalTax
+
+
+
+        const orders = await OrderedItems.insertMany(newOrder)
+        const allid = orders.map(obj => obj._id)
+        const invoiceNumber = await generateInvoiceNumber(req.user._id);
+        existingCustomer.balance += parseInt(grandtotal)
+        await existingCustomer.save()
+        const result = await Invoice.create({ InvoiceNo: invoiceNumber, OrderItems: allid, TotalAmount: parseInt(grandtotal), Subtotal: Subtotal, TotalProfit: totalprofit, TotalDiscount: TotalDiscount, TotalTax: TotalTax, customerId: id, shopkeeperId: req.user._id });
+        return resp.status(202).json({ message: 'Invoice generated successfully', result, ordereditems: newOrder })
+    } catch (error) {
+        resp.status(500).send({ message: "Internal Server Error", error })
+    }
+})
+// get Customers 
+Routes.get("/getCustomer/:id", checkuserdetails, async (req, resp) => {
+    try {
+        const { id } = req.params
+        if (!id || !mongoose.isValidObjectId(id)) return resp.status(404).json({ message: "Customer is not valid" })
+
+        const existingCustomer = await Customer.findOne({ _id: id, customerof: req.user._id })
+        if (!existingCustomer) return resp.status(404).json({ message: "Customer is not found in your list" })
+        return resp.status(202).json({ message: "Customer fetched successfully", existingCustomer })
+    } catch (error) {
+        return resp.status(500).json({ message: "Internal Server Error", error })
+    }
+})
+Routes.get("/getShopkeeper", checkuserdetails, async (req, resp) => {
+    try {
+        const existingShopkeeper = await Shopkeeper.findOne({ _id: req.user._id }).select("-password -_id")
+        if (!existingShopkeeper) return resp.status(404).json({ message: "Shopkeeper is not found in your list" })
+        return resp.status(202).json({ messsage: "Shopkeeper fetched successfully", existingShopkeeper })
+    } catch (error) {
+        return resp.status(500).json({ message: "Internal Server Error", error })
+    }
+})
+Routes.post("/addpayment/:id", checkuserdetails, async (req, resp) => {
+    try {
+        const { RecieptNo, payment, Description } = req.body
+        if (!RecieptNo || !payment) return resp.status(404).json({ message: "Field is Empty" })
+        const { id } = req.params
+        if (!id || !mongoose.isValidObjectId(id)) return resp.status(404).json({ message: "Customer is not valid" })
+
+        const existingCustomer = await Customer.findOne({ _id: id, customerof: req.user._id })
+        if (!existingCustomer) return resp.status(404).json({ message: "Customer is not found in your list" })
+        existingCustomer.balance -= payment
+        const updatedCustomer = await Customer.updateOne({ _id: id, customerof: req.user._id }, { $set: { balance: existingCustomer.balance } })
+        const result = await Payment.create({ shopkeeperId: req.user._id, customerId: id, RecieptNo, payment, Description })
+        return resp.status(202).json({ message: "Customer updated successfully", updatedCustomer, result })
+    } catch (error) {
+        return resp.status(500).json({ message: "Internal Server Error", error })
+    }
+})
 
 module.exports = Routes

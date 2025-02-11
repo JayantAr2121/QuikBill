@@ -6,15 +6,14 @@ const ProductSchema = new mongoose.Schema(
             type: mongoose.Schema.Types.ObjectId,
             ref: process.env.MONGODB_USER_COLLECTION,
             required: true,
-          },
+        },
         name: {
             type: String,
             required: true,
         },
         model: {
             type: String,
-            required: true,
-            unique: true,
+            required: true
         },
         description: {
             type: String,
@@ -45,12 +44,12 @@ const ProductSchema = new mongoose.Schema(
             required: true,
             default: 0,
         },
-        createdAt:{
+        createdAt: {
             type: Date,
-        default: Date.now,
+            default: Date.now,
         }
     });
 
-
+    ProductSchema.index({ userid: 1, model: 1 }, { unique: true });
 const Product = mongoose.model(process.env.MONGODB_PRODUCT_COLLECTION, ProductSchema);
 module.exports = Product
