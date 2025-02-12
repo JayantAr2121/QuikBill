@@ -1,6 +1,8 @@
-import React from 'react'
-
+import React, { useState } from 'react'
+import {useNavigate} from 'react-router-dom'
+import Api from '../../Api/InstanceApi'
 const ExeAddTransaction = () => {
+    const navigate=useNavigate
     const [loading, setloading] = useState(false)
     const [obj, setobj] = useState({})
     const set = (event) => setobj({ ...obj, [event.target.name]: event.target.value })
