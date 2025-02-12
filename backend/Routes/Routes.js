@@ -20,18 +20,24 @@ Routes.get('/', async (req, resp) => {
 // User API
 Routes.post('/verify', checkuserdetails, async (req, resp) => {
     try {
-        const { name, phone, email, address, password, city, state, role } = req.body
+        const { name, phone, email, address, password, city, state, role, executiveof } = req.body
 
         if (!name || !phone || !email || !password || !city || city === "None" || !address || !state || state === "None" || !role) return resp.status(404).send({ message: "Feild is Empyty" })
 
         const alreadyExist = await User.findOne({ email })
         if (alreadyExist) return resp.status(400).send({ message: "Account already Exist" })
 
+        if (role === "Executive") {
+            if (!executiveof) return resp.status(404).json({ message: "Select The Admin" })
+            if (!mongoose.isValidObjectId(executiveof)) return resp.status(404).json({ message: "Admin is not valid" })
+            const Shopkeeperexist = await User.findOne({ _id: executiveof })
+            if (!Shopkeeperexist) return resp.status(404).json({ message: "Shopkeeper Not Found" })
+        }
         const otp = otpGenerator(email)
 
         const response = EmailSender(email, otp)
 
-        resp.status(202).send({ message: "otp Send", otp, response })
+        resp.status(202).send({ message: "otp Send" })
     } catch (error) {
         resp.status(500).send({ Message: "Internal Error", error })
     }
@@ -41,7 +47,7 @@ Routes.post('/verify', checkuserdetails, async (req, resp) => {
 Routes.post('/CreateAccount', checkuserdetails, async (req, resp) => {
     try {
 
-        const { name, phone, email, address, password, city, state, role, otp } = req.body
+        const { name, phone, email, address, password, city, state, role, otp, executiveof } = req.body
 
         if (!name || !phone || !email || !address || !city || city === "None" || !state || state === "None" || !password || !role) return resp.status(404).send({ message: "Feild is Empyty" })
 
@@ -50,11 +56,23 @@ Routes.post('/CreateAccount', checkuserdetails, async (req, resp) => {
         const existinguser = await User.findOne({ email });
         if (existinguser) return resp.status(400).json({ "Message": "Account already exists" })
 
+        if (role === "Executive") {
+            if (!executiveof) return resp.status(404).json({ message: "Select The Admin" })
+            if (!mongoose.isValidObjectId(executiveof)) return resp.status(404).json({ message: "Admin is not valid" })
+            const Shopkeeperexist = await User.findOne({ _id: executiveof })
+            if (!Shopkeeperexist) return resp.status(404).json({ message: "Shopkeeper Not Found" })
+        }
+
         const result = verifyOtp(email, otp)
         if (!result.status) return resp.status(401).send({ message: "please Send Valid Otp", result })
 
-        const createresp = await User.create({ name, phone, email, address, password, city, state, role })
-        return resp.status(201).send({ message: "Account Created Successfully", createresp })
+        if (role === "Shopkeeper") {
+            const createresp = await User.create({ name, phone, email, address, password, city, state, role })
+            return resp.status(201).send({ message: "Account Created Successfully", createresp })
+        } else if (role === "Executive") {
+            const createresp = await Executive.create({ name, phone, email, address, password, city, state, role, executiveof })
+            return resp.status(201).send({ message: "Account Created Successfully", createresp })
+        }
     } catch (error) {
         resp.status(500).send({ Message: "Internal Error", error })
     }
@@ -73,6 +91,19 @@ Routes.post('/Login', async (req, resp) => {
 
         if (!validuser.service) return resp.status(400).send({ message: "No Subscription" })
 
+        if (validuser.role === "Executive") {
+
+            if (!validuser.executiveof) resp.status(404).json({ message: "Executive Not Found" })
+
+            const payload = { id: validuser._id, executiveid: validuser.executiveof }
+
+            const token = jwt.sign(payload, process.env.JSON_SECRET_KEY)
+
+
+            return resp.status(202).send({ message: "Login Successfully", "resultObj": { token, role: validuser.role } })
+
+        }
+        console.log("hello")
         const payload = { id: validuser._id }
 
         const token = jwt.sign(payload, process.env.JSON_SECRET_KEY)
@@ -142,7 +173,7 @@ Routes.post('/UploadProduct', checkuserdetails, async (req, resp) => {
         const existingproduct = await Product.findOne({ model, userid: req.user._id });
         if (existingproduct) return resp.status(400).send({ message: "Product of this model already exists" });
 
-        const result = await Product.create({ userid: req.user._id, name, company, model:model, description, price, discount, rate, tax, stock })
+        const result = await Product.create({ userid: req.user._id, name, company, model: model, description, price, discount, rate, tax, stock })
         resp.status(202).send({ message: "Uploaded Successfully", result })
     } catch (error) {
         resp.status(500).send({ Message: "Internal Error", error })
@@ -181,9 +212,11 @@ Routes.put("/UpdateProduct/:id", checkuserdetails, async (req, resp) => {
 })
 Routes.get("/GetProducts", checkuserdetails, async (req, resp) => {
     try {
+        console.log(req.user)
         const allproducts = await Product.find({ userid: req.user._id });
+        console.log(allproducts)
         if (allproducts.length === 0) return resp.status(404).json({ message: "Your product list is empty" })
-
+        // console.log("hello")
         return resp.status(200).send({ message: "all Products", allproducts });
     } catch (error) {
         return resp.status(500).send({ message: "Internal Server error", error });
@@ -499,5 +532,68 @@ Routes.post("/addpayment/:id", checkuserdetails, async (req, resp) => {
         return resp.status(500).json({ message: "Internal Server Error", error })
     }
 })
+
+// Dashboard  
+Routes.get('/GetAllTransaction', checkuserdetails, async (req, resp) => {
+    try {
+        if (!req.user || !req.user._id) {
+            return resp.status(401).json({ message: "Unauthorized access" });
+        }
+        const result = await Transaction.find({ shopkeeperId: req.user._id })
+        if (!result || result.length === 0) return resp.status(404).json({ message: "Transaction list is empty" })
+        let PaymentRecives = 0
+        let GrandTotalAmount = 0
+        let GrandTotalTax = 0
+        let GrandTotalDiscount = 0
+        let GrandTotalProfit = 0
+        let GrandSubTotal = 0
+
+        result.map((invoiceobj) => {
+            if (invoiceobj.paymentType === "credit") {
+                GrandTotalAmount += invoiceobj.TotalAmount
+                GrandTotalTax += invoiceobj.TotalTax
+                GrandTotalDiscount += invoiceobj.TotalDiscount
+                GrandTotalProfit += invoiceobj.TotalProfit
+                GrandSubTotal += invoiceobj.Subtotal
+            }
+            if (invoiceobj.paymentType === "debit") {
+                PaymentRecives += invoiceobj.payment
+            }
+        })
+        const dataobj = { "GrandTotalAmount": GrandTotalAmount, "GrandTotalTax": GrandTotalTax, "GrandTotalDiscount": GrandTotalDiscount, "GrandTotalProfit": GrandTotalProfit, "GrandSubTotal": GrandSubTotal, "PaymentRecives": PaymentRecives }
+        return resp.status(202).json({ message: "fetched Successfully", dataobj })
+    } catch (error) {
+        console.error("Error fetching transactions:", error.message);
+        return resp.status(500).json({ message: "Internal server error", error: error.message });
+    }
+})
+Routes.get('/GetAllRecentTransaction', checkuserdetails, async (req, resp) => {
+    try {
+        if (!req.user || !req.user._id) {
+            return resp.status(401).json({ message: "Unauthorized access" });
+        }
+        const result = await Transaction.find({ shopkeeperId: req.user._id }).sort({ createdAt: -1 }).limit(5).select("paymentType createdAt payment TotalAmount ")
+        return resp.status(202).json({ message: "fetched Successfully", result })
+    } catch (error) {
+        console.error("Error fetching transactions:", error.message);
+        return resp.status(500).json({ message: "Internal server error", error: error.message });
+    }
+})
+Routes.get('/GetAllInvoiceList', checkuserdetails, async (req, resp) => {
+    try {
+        const allInvoices = await Invoice.find({ shopkeeperId: req.user._id }).sort({ createdAt: -1 }).limit(7).populate("customerId", "name");
+        if (!allInvoices || allInvoices.length === 0) return resp.status(404).json({ message: "No latest invoices found" })
+
+        return resp.status(202).json({
+            message: "Fetched Successfully",
+            invoices: allInvoices
+        });
+
+    } catch (error) {
+        console.error("Error fetching invoices:", error.message);
+        return resp.status(500).json({ message: "Internal server error", error: error.message });
+    }
+});
+
 
 module.exports = Routes

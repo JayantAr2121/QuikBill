@@ -120,9 +120,9 @@ const logout=()=>{
                             </Link>
                         </li>
                         <li className="nav-item">
-                            <Link to={'/'} className="nav-link menu-link" href="#" >
+                            <a onClick={logout} className="nav-link menu-link" href="#" >
                                 <i className="las la-lock"/><span>Logout</span>
-                            </Link>
+                            </a>
                         </li>
                     </ul>
                 </div>

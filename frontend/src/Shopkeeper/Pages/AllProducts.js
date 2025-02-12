@@ -5,8 +5,8 @@ import AllProductsComponent from '../Components/AllProductsComponent'
 const AllProducts = () => {
   return (
     <div>
-      <ShopkeeperHeader/>
-      <AllProductsComponent/>
+      <ShopkeeperHeader />
+      <AllProductsComponent />
     </div>
   )
 }
