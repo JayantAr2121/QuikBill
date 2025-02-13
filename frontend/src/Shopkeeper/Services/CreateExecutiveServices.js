@@ -50,7 +50,7 @@ const CreateExecutiveServices = (props) => {
             })
             alert(response?.data.message)
             if (response.status === 202) setdisplayotpsection(true)
-            setotploading(false)
+            
         } catch (error) {
             if (error.response) {
                 alert(error.response.data.message)
@@ -60,6 +60,8 @@ const CreateExecutiveServices = (props) => {
             } else {
                 console.log('An unexpected error occurred');
             }
+        }finally{
+            setotploading(false)
         }
     }
     const submit = async (e) => {

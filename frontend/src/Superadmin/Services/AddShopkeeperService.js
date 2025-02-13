@@ -80,7 +80,7 @@ const AddShopkeeperService = (props) => {
             if (response.status === 202) {
                 setdisplayotpsection(true)
             }
-            setotploading(false)
+            
         } catch (error) {
             if (error.response) {
                 alert(error.response.data.message)
@@ -91,6 +91,7 @@ const AddShopkeeperService = (props) => {
                 console.log('An unexpected error occurred');
             }
         } finally {
+            setotploading(false)
             setloading(false)
         }
     }
@@ -119,7 +120,7 @@ const AddShopkeeperService = (props) => {
                 props.fun(false)
                 props.getallusers(userinfo.Authorization)
             }
-            setloading(false)
+            
         } catch (error) {
             if (error.response) {
                 alert(error.response.data.message)

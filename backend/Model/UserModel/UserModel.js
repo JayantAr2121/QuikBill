@@ -47,7 +47,6 @@ const BaseSchema = new mongoose.Schema(
     },
     { discriminatorKey: "role", collection: process.env.MONGODB_USER_COLLECTION}
   );
-// console.log(process.env.MONGODB_USER_COLLECTION)
 const User = mongoose.model( process.env.MONGODB_USER_COLLECTION, BaseSchema);
 
 const ShopkeeperSchema = new mongoose.Schema({

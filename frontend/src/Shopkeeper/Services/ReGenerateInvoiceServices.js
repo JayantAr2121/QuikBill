@@ -1,9 +1,10 @@
 import React, { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import Api from '../../Api/InstanceApi'
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
-import Api from '../../Api/InstanceApi';
-const InvoiceDetailsServices = ({data}) => {
+const ReGenerateInvoiceServices = () => {
+    const [data, setdata] = useState({})
+    const [Orders, setOrders] = useState([])
     const [customer, setcustomer] = useState({})
     const [shopkeeper, setshopkeeper] = useState({})
     const downloadInvoice = () => {
@@ -17,7 +18,7 @@ const InvoiceDetailsServices = ({data}) => {
             pdf.save('Invoice.pdf'); // Download as Invoice.pdf
         });
     };
-    const today = new Date(data?.result?.createdAt);
+    const today = new Date(data?.createdAt);
     const FutureDate = new Date()
     FutureDate.setDate(today.getDate() + 7)
     const getCustomer = async (token, id) => {
@@ -62,7 +63,34 @@ const InvoiceDetailsServices = ({data}) => {
             }
         }
     }
-    return { getShopkeeper,getCustomer,today,FutureDate,downloadInvoice,shopkeeper,customer}
+    const getInvoicedata = async (token, id) => {
+        try {
+            const response = await Api.get("/RegenetrateInvoice/" + id, {
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": token
+                }
+            })
+            console.log(response)
+            if (response.status === 200) {
+                await getCustomer(token, response?.data.Invoice.customerId)
+                setdata(response?.data.Invoice)
+                setOrders(response?.data.Orders)
+            }
+            else alert(response?.data.message)
+        } catch (error) {
+            if (error.response) {
+                alert(error.response.data.message)
+                console.log(error.response.data.message);
+            } else if (error.request) {
+                console.log('No response from server');
+            } else {
+                console.log('An unexpected error occurred');
+            }
+        }
+    }
+    console.log("Shopkeeper", shopkeeper, "Customer", customer)
+    return { getShopkeeper, getCustomer, today, FutureDate, downloadInvoice, shopkeeper, customer, getInvoicedata, Orders, data }
 }
 
-export default InvoiceDetailsServices
+export default ReGenerateInvoiceServices

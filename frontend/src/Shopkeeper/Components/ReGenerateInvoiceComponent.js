@@ -1,17 +1,20 @@
-import React, { useEffect, useState } from 'react'
-import Footer from '../../CommonComponents/Footer'
-import Title from '../../CommonComponents/Title'
+import React, { useEffect, useRef } from 'react'
+import ReGenerateInvoiceServices from '../Services/ReGenerateInvoiceServices'
 import { useNavigate } from 'react-router-dom'
-import InvoiceDetailsServices from '../Services/InvoiceDetailsServices'
-const InvoiceDetails = ({ data }) => {
+import Title from '../../CommonComponents/Title'
+import Footer from '../../CommonComponents/Footer'
+import { useReactToPrint } from "react-to-print";
+const ReGenerateInvoiceComponent = () => {
+    const contentRef = useRef()
+    const reactToPrintFn = useReactToPrint({ contentRef, pageStyle: '@media print { @page { size: A4 Landscape; } }' }); // To Print
     const navigate = useNavigate()
-    console.log(data)
-    const { getShopkeeper, getCustomer, today, FutureDate, downloadInvoice, shopkeeper, customer } = InvoiceDetailsServices({ data })
+    const { getShopkeeper, today, FutureDate, downloadInvoice, shopkeeper, customer, getInvoicedata, Orders, data } = ReGenerateInvoiceServices()
     useEffect(() => {
         const getdata = async () => {
             const userinfo = JSON.parse(localStorage.getItem("Userinfo"))
+            const InvoiceInfo = JSON.parse(localStorage.getItem("InvoiceInfo"))
             if (userinfo && userinfo.Authorization) {
-                await getCustomer(userinfo.Authorization, data?.result?.customerId)
+                await getInvoicedata(userinfo.Authorization, InvoiceInfo.id)
                 return await getShopkeeper(userinfo.Authorization)
             }
             localStorage.clear()
@@ -23,10 +26,10 @@ const InvoiceDetails = ({ data }) => {
         <div className="main-content">
             <div className="page-content">
                 <div className="container-fluid">
-                    <Title Name={"Invoices Details"} />
+                    <Title Name={"Get Invoice"} />
                     <div className="row justify-content-center">
                         <div className="col-xxl-9">
-                            <div className="card" id="demo">
+                            <div ref={contentRef} className="card" id="demo">
                                 <div className="card-body" id='invoice-content'>
                                     <div className="row p-4">
                                         <div className="col-lg-8">
@@ -34,11 +37,11 @@ const InvoiceDetails = ({ data }) => {
                                             <div className="row g-4">
                                                 <div className="col-lg-6 col-6">
                                                     <p className="text-muted mb-1 text-uppercase fw-medium fs-14">Invoice No</p>
-                                                    <h5 className="fs-16 mb-0">#<span id="invoice-no">{data?.result?.InvoiceNo}</span></h5>
+                                                    <h5 className="fs-16 mb-0">#<span id="invoice-no">{data?.InvoiceNo}</span></h5>
                                                 </div>
                                                 <div className="col-lg-6 col-6">
                                                     <p className="text-muted mb-1 text-uppercase fw-medium fs-14">Date</p>
-                                                    <h5 className="fs-16 mb-0"><span id="invoice-date">{new Date(data?.result?.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>, <small className="text-muted" id="invoice-time">{new Date(data?.result?.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}</small></h5>
+                                                    <h5 className="fs-16 mb-0"><span id="invoice-date">{new Date(data?.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>, <small className="text-muted" id="invoice-time">{new Date(data?.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}</small></h5>
                                                 </div>
                                                 <div className="col-lg-6 col-6">
                                                     <p className="text-muted mb-1 text-uppercase fw-medium fs-14">Payment Status</p>
@@ -46,7 +49,7 @@ const InvoiceDetails = ({ data }) => {
                                                 </div>
                                                 <div className="col-lg-6 col-6">
                                                     <p className="text-muted mb-1 text-uppercase fw-medium fs-14">Total Amount</p>
-                                                    <h5 className="fs-16 mb-0">₹<span id="total-amount">{data?.result?.TotalAmount}/-</span></h5>
+                                                    <h5 className="fs-16 mb-0">₹<span id="total-amount">{data?.TotalAmount}/-</span></h5>
                                                 </div>
                                             </div>
                                         </div>
@@ -79,7 +82,7 @@ const InvoiceDetails = ({ data }) => {
                                         </div>
                                         <div className="col-lg-3">
                                             <h6 className="text-muted text-uppercase fw-semibold mb-3">Total Amount</h6>
-                                            <h3 className="fw-bold mb-2">₹{data?.result?.TotalAmount}/-</h3>
+                                            <h3 className="fw-bold mb-2">₹{data?.TotalAmount}/-</h3>
                                             <span className="badge bg-success-subtle text-success fs-12">Due Date: {FutureDate.toLocaleDateString("en-GB", { day: '2-digit', month: 'short', year: 'numeric' })}</span>
                                         </div>
                                     </div>
@@ -101,7 +104,7 @@ const InvoiceDetails = ({ data }) => {
                                                         </thead>
                                                         <tbody id="products-list">
                                                             {
-                                                                data?.ordereditems?.map((item, index) => {
+                                                                Orders?.map((item, index) => {
                                                                     return (<tr key={index}>
                                                                         <th scope="row">{index + 1}</th>
                                                                         <td className="text-start">
@@ -124,19 +127,19 @@ const InvoiceDetails = ({ data }) => {
                                                         <tbody>
                                                             <tr>
                                                                 <td>Sub Total</td>
-                                                                <td className="text-end">₹{data?.ordereditems?.Subtotal}</td>
+                                                                <td className="text-end">₹{data?.Subtotal}</td>
                                                             </tr>
                                                             <tr>
                                                                 <td>Estimated Tax (+)</td>
-                                                                <td className="text-end">₹{data?.result?.TotalTax}</td>
+                                                                <td className="text-end">₹{data?.TotalTax}</td>
                                                             </tr>
                                                             <tr>
                                                                 <td>Discount <small className="text-muted">(-)</small></td>
-                                                                <td className="text-end">₹{data?.result?.TotalDiscount}</td>
+                                                                <td className="text-end">₹{data?.TotalDiscount}</td>
                                                             </tr>
                                                             <tr className="border-top border-top-dashed fs-15">
                                                                 <th scope="row">Total Amount</th>
-                                                                <th className="text-end">₹{data?.result?.TotalAmount}/-</th>
+                                                                <th className="text-end">₹{data?.TotalAmount}/-</th>
                                                             </tr>
                                                         </tbody>
                                                     </table>
@@ -157,7 +160,7 @@ const InvoiceDetails = ({ data }) => {
                                                     </div>
                                                 </div>
                                                 <div className="hstack gap-2 justify-content-end d-print-none mt-4">
-                                                    <a className="btn btn-info"><i className="ri-printer-line align-bottom me-1" /> Print</a>
+                                                    <a onClick={() => reactToPrintFn()} className="btn btn-info"><i className="ri-printer-line align-bottom me-1" /> Print</a>
                                                     <a onClick={downloadInvoice} className="btn btn-primary"><i className="ri-download-2-line align-bottom me-1" /> Download</a>
                                                 </div>
                                             </div>
@@ -174,4 +177,4 @@ const InvoiceDetails = ({ data }) => {
     )
 }
 
-export default InvoiceDetails
+export default ReGenerateInvoiceComponent

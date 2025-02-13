@@ -16,6 +16,7 @@ import ExecutiveAddTransaction from './Executive/Pages/ExecutiveAddTransaction'
 import ExecutiveProducts from './Executive/Pages/ExecutiveProducts'
 import ExecutiveInvoices from './Executive/Pages/ExecutiveInvoices'
 import AllProducts from './Shopkeeper/Pages/AllProducts'
+import ReGenerateInvoice from './Shopkeeper/Pages/ReGenerateInvoice'
 const App = () => {
   return (
     <div>
@@ -35,6 +36,7 @@ const App = () => {
           <Route path='/AllProducts' element={<AllProducts/>}></Route>
           <Route path='/UserDetails' element={<UserDetails/>}></Route>
           <Route path='/ManageExecutive' element={<Executive/>}></Route>
+          <Route path='/GenerateInvoice' element={<ReGenerateInvoice/>}></Route>
           {/* login page */}
           <Route path='/' element={<SignIn/>}/>
           {/* executive */}

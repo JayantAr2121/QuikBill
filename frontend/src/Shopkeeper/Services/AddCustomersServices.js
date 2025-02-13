@@ -30,7 +30,6 @@ const AddCustomersServices = (props) => {
                 props.setToggle(false)
                 await props.getallcustomers(userinfo.Authorization)
             }
-            setloading(false)
         } catch (error) {
             if (error.response) {
                 alert(error.response.data.message)

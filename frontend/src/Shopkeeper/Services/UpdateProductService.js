@@ -23,7 +23,7 @@ const UpdateProductService = (props) => {
             })
             alert(response?.data?.message)
             if (response.status === 202) { await props.getallproducts(userinfo.Authorization); props.setToggle(false); props.setid(null); props.setobj({}) }
-            props.setloading(false)
+            
         } catch (error) {
             if (error.response) {
                 alert(error.response.data.message)
@@ -33,6 +33,8 @@ const UpdateProductService = (props) => {
             } else {
                 console.log('An unexpected error occurred');
             }
+        }finally{
+            props.setloading(false)
         }
     }
     return { updateproduct, set }

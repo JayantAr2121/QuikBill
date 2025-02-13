@@ -3,7 +3,7 @@ require('dotenv').config()
 const ItemsSchema = new mongoose.Schema({
     shopkeeperid:{
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'users',
+        ref: process.env.MONGODB_USER_COLLECTION,
         required: true
     },
     name: {

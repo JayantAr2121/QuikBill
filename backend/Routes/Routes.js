@@ -103,7 +103,6 @@ Routes.post('/Login', async (req, resp) => {
             return resp.status(202).send({ message: "Login Successfully", "resultObj": { token, role: validuser.role } })
 
         }
-        console.log("hello")
         const payload = { id: validuser._id }
 
         const token = jwt.sign(payload, process.env.JSON_SECRET_KEY)
@@ -212,24 +211,20 @@ Routes.put("/UpdateProduct/:id", checkuserdetails, async (req, resp) => {
 })
 Routes.get("/GetProducts", checkuserdetails, async (req, resp) => {
     try {
-        console.log(req.user)
         const allproducts = await Product.find({ userid: req.user._id });
-        console.log(allproducts)
         if (allproducts.length === 0) return resp.status(404).json({ message: "Your product list is empty" })
-        // console.log("hello")
         return resp.status(200).send({ message: "all Products", allproducts });
     } catch (error) {
         return resp.status(500).send({ message: "Internal Server error", error });
     }
 })
 
-
 // Customers API
 Routes.post("/createcustomer", checkuserdetails, async (req, resp) => {
     try {
         const { name, phone, address } = req.body
         if (!name || !phone || !address) return resp.status(404).json({ message: "Feild is empty" })
-        const existingcustomer = await Customer.findOne({ phone })
+        const existingcustomer = await Customer.findOne({ phone, customerof: req.user._id })
         if (existingcustomer) return resp.status(400).json({ message: "Customer Already Exists" })
         const newcustomer = await Customer.create({ name, phone, address, customerof: req.user._id })
         return resp.status(202).send({ message: "Customer Created Successfully", newcustomer })
@@ -447,7 +442,9 @@ Routes.post('/createInvoice/:id', checkuserdetails, async (req, resp) => {
         if (iserror.length > 0) return resp.status(400).json({ message: "Validation error occur", iserror })
 
         const allids = ordereditems.map(item => new mongoose.Types.ObjectId(item.id))
+        console.log(allids)
         const allproducts = await Product.find({ _id: { $in: allids } })
+        console.log(allproducts)
         if (allids.length !== allproducts.length) return resp.status(404).json({ message: "One or More Products is missing" })
 
         for (const item of ordereditems) {
@@ -563,7 +560,6 @@ Routes.get('/GetAllTransaction', checkuserdetails, async (req, resp) => {
         const dataobj = { "GrandTotalAmount": GrandTotalAmount, "GrandTotalTax": GrandTotalTax, "GrandTotalDiscount": GrandTotalDiscount, "GrandTotalProfit": GrandTotalProfit, "GrandSubTotal": GrandSubTotal, "PaymentRecives": PaymentRecives }
         return resp.status(202).json({ message: "fetched Successfully", dataobj })
     } catch (error) {
-        console.error("Error fetching transactions:", error.message);
         return resp.status(500).json({ message: "Internal server error", error: error.message });
     }
 })
@@ -575,7 +571,6 @@ Routes.get('/GetAllRecentTransaction', checkuserdetails, async (req, resp) => {
         const result = await Transaction.find({ shopkeeperId: req.user._id }).sort({ createdAt: -1 }).limit(5).select("paymentType createdAt payment TotalAmount ")
         return resp.status(202).json({ message: "fetched Successfully", result })
     } catch (error) {
-        console.error("Error fetching transactions:", error.message);
         return resp.status(500).json({ message: "Internal server error", error: error.message });
     }
 })
@@ -590,10 +585,39 @@ Routes.get('/GetAllInvoiceList', checkuserdetails, async (req, resp) => {
         });
 
     } catch (error) {
-        console.error("Error fetching invoices:", error.message);
         return resp.status(500).json({ message: "Internal server error", error: error.message });
     }
 });
+
+// Re GenerateInvoice 
+Routes.get('/RegenetrateInvoice/:id', checkuserdetails, async (req, resp) => {
+    try {
+        const { id } = req.params;
+
+        if (!id || !mongoose.isValidObjectId(id)) {
+            return resp.status(404).json({ message: "Customer is not valid" });
+        }
+
+        const existingInvoice = await Invoice.findOne({ _id: id });
+        if (!existingInvoice) {
+            return resp.status(404).json({ message: "Invoice Not Found" });
+        }
+
+        let orderedIds = existingInvoice.OrderItems;
+        if (!Array.isArray(orderedIds) || orderedIds.length === 0) {
+            return resp.status(400).json({ message: "No order items found in the invoice" });
+        }
+        const allProducts = await OrderedItems.find({ _id: { $in: orderedIds } });
+        if (orderedIds.length !== allProducts.length) return resp.status(404).json({ message: "Invalid Invoice" })
+
+        return resp.status(200).json({ message: "Fetched Successfully", Invoice: existingInvoice, Orders: allProducts });
+
+    } catch (error) {
+        console.error("Error regenerating invoice:", error);
+        return resp.status(500).json({ message: "Internal Server Error" });
+    }
+});
+
 
 
 module.exports = Routes

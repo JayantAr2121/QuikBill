@@ -42,6 +42,8 @@ const ProductServices = () => {
             } else {
                 console.log('An unexpected error occurred');
             }
+        }finally{
+            seteditloading(false)
         }
     }
     const deleteproduct = async (id) => {

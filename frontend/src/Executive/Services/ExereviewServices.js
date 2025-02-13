@@ -31,7 +31,6 @@ const ExereviewServices = ({ data }) => {
             if (response.status === 202) setcustomer(response?.data.existingCustomer)
             else alert(response?.data.message)
         } catch (error) {
-            console.log(error);
             alert("Something went wrong. Try again later")
         }
     }

@@ -16,7 +16,7 @@ const TransactionListComponent = () => {
     }
     getdata()
   }, [])
- const {getalltransactions,transactions}=TransactionListServices()
+  const {getalltransactions,transactions}=TransactionListServices()
   return (
     <div className="main-content">
       <div className="page-content">
@@ -59,6 +59,7 @@ const TransactionListComponent = () => {
                           <th scope="col">Tax</th>
                           <th scope="col">Discount</th>
                           <th scope="col">Profit</th>
+                          <th scope="col">Get Invoice</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -71,6 +72,7 @@ const TransactionListComponent = () => {
                             <td>{transaction.TotalTax ? `₹ ${transaction.TotalTax} /-` : " - "}</td>
                             <td>{transaction.TotalDiscount ? `₹${transaction.TotalDiscount}/-` : " - "}</td>
                             <td>{transaction.TotalProfit ? `₹${transaction.TotalProfit}/-` : " - "}</td>
+                            <td>{transaction.TotalProfit ? <button type='button' className='btn btn-primary' onClick={()=>{localStorage.setItem("InvoiceInfo",JSON.stringify({id:transaction._id}));navigate("/GenerateInvoice")}} >Get Invoice</button>: " - "}</td>
                           </tr>
 
                         ))

@@ -25,7 +25,7 @@ const LoginServices = () => {
                 localStorage.setItem("Userinfo", JSON.stringify({ "Authorization": resp.data.resultObj.token, "Rememberme": rememberme }))
                 navigate("/" + resp.data.resultObj.role)
             }
-            setloading(false)
+
         } catch (error) {
             if (error.response) {
                 console.log(error.response.data.message);
@@ -34,6 +34,8 @@ const LoginServices = () => {
             } else {
                 console.log('An unexpected error occurred');
             }
+        } finally {
+            setloading(false)
         }
     }
     useEffect(() => {
@@ -51,7 +53,6 @@ const LoginServices = () => {
                     "Authorization": token
                 }
             });
-            console.log(resp.data)
             alert(resp?.data?.message)
             if (resp.status === 202) {
                 localStorage.clear()
